@@ -51,7 +51,7 @@ export const register = async (req, res) => {
     }
 };
 
-// User login
+/* // User login
 export const login = async (req, res) => {
     const { email, password } = req.body;
 
@@ -62,6 +62,7 @@ export const login = async (req, res) => {
         const admin = await Admin.findOne({ email });
         if (viewer) {
             user = viewer;
+            
         }
         else if (admin) {
             user = admin;
@@ -100,6 +101,47 @@ export const login = async (req, res) => {
 
     } catch (error) {
         console.error(error); // Log the error for debugging
+        res.status(500).json({ status: false, message: 'Failed to log in' });
+    }
+}; */
+export const login = async (req, res) => {
+    const { email, password } = req.body;
+
+    try {
+        let user = null;
+        // Check both collections simultaneously
+        const [viewer, admin] = await Promise.all([
+            User.findOne({ email }),
+            Admin.findOne({ email })
+        ]);
+
+        // Handle found user (prioritize viewer if both exist)
+        if (viewer) user = viewer;
+        else if (admin) user = admin;
+        else return res.status(400).json({ status: false, message: 'Invalid credentials' });
+
+        // Password comparison
+        const isPasswordMatch = await bcrypt.compare(password, user.password);
+        if (!isPasswordMatch) {
+            return res.status(400).json({ status: false, message: 'Invalid credentials' });
+        }
+
+        // Generate token
+        const token = generateToken(user);
+
+        // Prepare response data
+        const { password: _, ...userData } = user._doc;
+        
+        res.status(200).json({
+            status: true,
+            message: 'Successfully logged in',
+            token,
+            data: userData,
+            role: userData.role // Ensure role exists in schema
+        });
+
+    } catch (error) {
+        console.error('Login error:', error);
         res.status(500).json({ status: false, message: 'Failed to log in' });
     }
 };
